@@ -1,0 +1,4 @@
+# Optional Feast feature-store support. Feast 0.49 requires PyArrow <=17 and
+# should be installed in a Python 3.12 environment, separate from the app UI.
+feast==0.49.0
+pyarrow==17.0.0
