@@ -1,0 +1,123 @@
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  mlflow:
+    image: ${RECSYS_IMAGE:-retailrocket-recsys:local}
+    build: .
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "file:/mlflow/mlruns", "--default-artifact-root", "file:/mlflow/artifacts"]
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "127.0.0.1:5000:5000"
+
+  api:
+    image: ${RECSYS_IMAGE:-retailrocket-recsys:local}
+    build: .
+    environment:
+      RECSYS_ARTIFACT_DIR: /app/artifacts
+      RECSYS_TRACKING_URI: http://mlflow:5000
+      RECSYS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      RECSYS_EVENT_LOG_DIR: /app/data/events
+      RECSYS_ASSIGNMENT_SALT: ${RECSYS_ASSIGNMENT_SALT:?Set RECSYS_ASSIGNMENT_SALT in .env}
+      RECSYS_API_KEY: ${RECSYS_API_KEY:?Set RECSYS_API_KEY in .env}
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+      - ./data/events:/app/data/events
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  streamlit:
+    image: ${RECSYS_IMAGE:-retailrocket-recsys:local}
+    build: .
+    command: ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
+    environment:
+      RECSYS_ARTIFACT_DIR: /app/artifacts
+      RECSYS_ASSIGNMENT_SALT: ${RECSYS_ASSIGNMENT_SALT:?Set RECSYS_ASSIGNMENT_SALT in .env}
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      - api
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  event-sink:
+    image: ${RECSYS_IMAGE:-retailrocket-recsys:local}
+    build: .
+    command: ["python", "-m", "recsys.event_sink"]
+    environment:
+      RECSYS_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      RECSYS_EVENT_LOG_DIR: /app/data/events
+    volumes:
+      - ./data/events:/app/data/events
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.3
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus"]
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  kafka-data:
+  mlflow-data:
+  prometheus-data:
+  grafana-data:

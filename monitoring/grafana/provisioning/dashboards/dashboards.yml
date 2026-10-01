@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: Recommender
+    orgId: 1
+    folder: Recommender
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards

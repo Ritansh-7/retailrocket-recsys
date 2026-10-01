@@ -1,0 +1,26 @@
+stages:
+  validate-data:
+    cmd: .\\.venv\\Scripts\\python.exe -m recsys.validate_data
+    deps:
+      - data/raw/category_tree.csv
+      - data/raw/events.csv
+      - data/raw/item_properties_part1.csv
+      - data/raw/item_properties_part2.csv
+      - src/recsys/validate_data.py
+  train:
+    cmd: .\\.venv\\Scripts\\python.exe -m recsys.train_fast
+    deps:
+      - data/raw/events.csv
+      - src/recsys/train_fast.py
+      - src/recsys/model.py
+      - src/recsys/config.py
+    outs:
+      - artifacts/item_neighbors.json
+      - artifacts/popular_items.json
+      - artifacts/item_neighbors.parquet
+      - artifacts/popular_items.parquet
+      - artifacts/visitor_features.parquet
+      - artifacts/item_features.parquet
+    metrics:
+      - artifacts/metrics.json:
+          cache: false

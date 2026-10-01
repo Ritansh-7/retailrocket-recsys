@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality-and-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install ruff
+      - run: pip install -e .
+      - run: ruff check src feature_repo streamlit_app.py
+      - run: python -m compileall -q src feature_repo streamlit_app.py
+      - run: streamlit hello --help > /dev/null
+      - run: python -c "import streamlit; print(streamlit.__version__)"
+      - run: docker build --tag retailrocket-recsys:ci .

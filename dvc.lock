@@ -1,0 +1,73 @@
+schema: '2.0'
+stages:
+  validate-data:
+    cmd: .\\.venv\\Scripts\\python.exe -m recsys.validate_data
+    deps:
+    - path: data/raw/category_tree.csv
+      hash: md5
+      md5: f0e1eb878ae66209004112f6355d7e83
+      size: 14454
+    - path: data/raw/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: data/raw/item_properties_part1.csv
+      hash: md5
+      md5: cb43a0682a1af76f1c1b60f9163ae47b
+      size: 484315749
+    - path: data/raw/item_properties_part2.csv
+      hash: md5
+      md5: e74ec953e7b192920b195dfd82dc2a4e
+      size: 408929907
+    - path: src/recsys/validate_data.py
+      hash: md5
+      md5: cd72f666d35aa69eaa700aefd9d57166
+      size: 1663
+  train:
+    cmd: .\\.venv\\Scripts\\python.exe -m recsys.train_fast
+    deps:
+    - path: data/raw/events.csv
+      hash: md5
+      md5: fddaf7c1c6a9df23a726500a08ffdd7e
+      size: 94237913
+    - path: src/recsys/config.py
+      hash: md5
+      md5: 4cb72ca110f44417c50afdf69e3dd31f
+      size: 690
+    - path: src/recsys/model.py
+      hash: md5
+      md5: 0f5495ca90c65e84327348c115df8df1
+      size: 1439
+    - path: src/recsys/train_fast.py
+      hash: md5
+      md5: 620cb10152e42dd57b4281a36bd47d0d
+      size: 4185
+    outs:
+    - path: artifacts/item_features.parquet
+      hash: md5
+      md5: 5e96f2c7e560da2420d65c5dc2ac038b
+      size: 583475
+    - path: artifacts/item_neighbors.json
+      hash: md5
+      md5: 24c3096acd3f5baf16c2a127fc884d27
+      size: 1946430
+    - path: artifacts/item_neighbors.parquet
+      hash: md5
+      md5: 8d4fc8d373b67f0413eb45cc16709105
+      size: 874673
+    - path: artifacts/metrics.json
+      hash: md5
+      md5: 6bc2db3402232e0978f3798e2f37f54e
+      size: 271
+    - path: artifacts/popular_items.json
+      hash: md5
+      md5: 5b23f80f2f72d5f7f043e9e934509750
+      size: 77723
+    - path: artifacts/popular_items.parquet
+      hash: md5
+      md5: 77d77e6dc5c2f8ca4a6e2582ea2ef596
+      size: 68008
+    - path: artifacts/visitor_features.parquet
+      hash: md5
+      md5: 198bc4cf34f9cc5d7b229b3dbb03fda3
+      size: 906762
