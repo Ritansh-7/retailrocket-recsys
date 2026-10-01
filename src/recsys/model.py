@@ -8,6 +8,12 @@ class Recommender:
             self.popular_items: list[int] = json.load(f)
         with (artifact_dir / "item_neighbors.json").open(encoding="utf-8") as f:
             self.neighbors: dict[str, list[int]] = json.load(f)
+        sklearn_path = artifact_dir / "sklearn_neighbors.json"
+        if sklearn_path.exists():
+            with sklearn_path.open(encoding="utf-8") as f:
+                self.sklearn_neighbors: dict[str, list[int]] = json.load(f)
+        else:
+            self.sklearn_neighbors = self.neighbors
 
     def recommend(self, recent_item_ids: list[int], variant: str, limit: int = 10) -> list[int]:
         seen = set(recent_item_ids)
@@ -16,7 +22,9 @@ class Recommender:
         else:
             scores: dict[int, float] = {}
             for recency, item_id in enumerate(reversed(recent_item_ids[-20:]), start=1):
-                for rank, candidate in enumerate(self.neighbors.get(str(item_id), []), start=1):
+                for rank, candidate in enumerate(
+                    self.sklearn_neighbors.get(str(item_id), []), start=1
+                ):
                     if candidate not in seen:
                         scores[candidate] = scores.get(candidate, 0.0) + 1.0 / (recency * rank)
             candidates = [

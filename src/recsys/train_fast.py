@@ -2,10 +2,15 @@
 
 import json
 import math
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import mlflow
 import pandas as pd
+from scipy.sparse import csr_matrix
+from sklearn import config_context
+from sklearn.neighbors import NearestNeighbors
 
 from recsys.config import settings
 
@@ -33,7 +38,40 @@ def train(data_dir: Path, artifact_dir: Path) -> dict:
         str(source): [item for item, _ in counts.most_common(100)]
         for source, counts in pairs.items()
     }
+    # Fit a scikit-learn item-item collaborative filtering model. Each item is
+    # represented by the visitors who interacted with it, and cosine distance
+    # finds items with similar visitor profiles.
+    visitor_codes, _ = pd.factorize(train.visitorid)
+    item_codes, item_ids = pd.factorize(train.itemid)
+    interactions = csr_matrix(
+        (
+            [1.0] * len(train),
+            (visitor_codes, item_codes),
+        ),
+        shape=(int(visitor_codes.max()) + 1, len(item_ids)),
+    )
+    item_matrix = interactions.T.tocsr()
+    neighbor_count = min(101, item_matrix.shape[0])
+    sklearn_model = NearestNeighbors(
+        n_neighbors=neighbor_count, metric="cosine", algorithm="brute", n_jobs=1
+    )
+    sklearn_model.fit(item_matrix)
+    with config_context(working_memory=16):
+        distances, indices = sklearn_model.kneighbors(item_matrix)
+    sklearn_neighbors = {
+        str(int(item_ids[item_index])): [
+            int(item_ids[index])
+            for distance, index in zip(row_distances[1:], row_indices[1:], strict=False)
+            if distance < 1.0
+        ]
+        for item_index, (row_distances, row_indices) in enumerate(
+            zip(distances, indices, strict=False)
+        )
+    }
     (artifact_dir / "item_neighbors.json").write_text(json.dumps(neighbors), encoding="utf-8")
+    (artifact_dir / "sklearn_neighbors.json").write_text(
+        json.dumps(sklearn_neighbors), encoding="utf-8"
+    )
     (artifact_dir / "popular_items.json").write_text(json.dumps(popular), encoding="utf-8")
     pd.DataFrame(
         {
@@ -68,7 +106,7 @@ def train(data_dir: Path, artifact_dir: Path) -> dict:
         users += 1
         treatment = []
         for source in reversed(history):
-            treatment.extend(neighbors.get(str(source), []))
+            treatment.extend(sklearn_neighbors.get(str(source), []))
         treatment = list(dict.fromkeys([x for x in treatment if x not in history]))[:10]
         treatment += [x for x in popular if x not in history and x not in treatment][
             : 10 - len(treatment)
@@ -91,8 +129,37 @@ def train(data_dir: Path, artifact_dir: Path) -> dict:
         "treatment_hit_rate_at_10": treatment_hits / denominator,
         "control_ndcg_at_10": control_ndcg / denominator,
         "treatment_ndcg_at_10": treatment_ndcg / denominator,
+        "sklearn_model": "NearestNeighbors cosine item-item collaborative filtering",
     }
     (artifact_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    try:
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", settings.tracking_uri))
+        mlflow.set_experiment(settings.experiment_name)
+        with mlflow.start_run(run_name="sklearn-nearest-neighbors"):
+            mlflow.log_params(
+                {
+                    "algorithm": "NearestNeighbors",
+                    "metric": "cosine",
+                    "n_neighbors": neighbor_count - 1,
+                    "training_rows": len(train),
+                }
+            )
+            mlflow.log_metrics(
+                {
+                    key: float(value)
+                    for key, value in metrics.items()
+                    if isinstance(value, int | float)
+                }
+            )
+            # Metrics are logged directly so the run remains portable when the
+            # training command runs outside the MLflow container.
+    except Exception as exc:
+        print(f"MLflow logging skipped: {exc}")
+        if mlflow.active_run() is not None:
+            try:
+                mlflow.end_run(status="FINISHED")
+            except Exception:
+                pass
     return metrics
 
 

@@ -16,6 +16,7 @@ stages:
       - src/recsys/config.py
     outs:
       - artifacts/item_neighbors.json
+      - artifacts/sklearn_neighbors.json
       - artifacts/popular_items.json
       - artifacts/item_neighbors.parquet
       - artifacts/popular_items.parquet

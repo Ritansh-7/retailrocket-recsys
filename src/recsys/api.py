@@ -29,7 +29,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 REQUESTS = Counter("recsys_requests_total", "Recommendation requests", ["variant", "status"])
 LATENCY = Histogram("recsys_request_duration_seconds", "Recommendation latency in seconds")
-EVENTS = Counter("recsys_events_published_total", "Events published to Kafka", ["event_type"])
+EVENTS = Counter(
+    "recsys_events_published_total", "Events published or saved locally", ["event_type"]
+)
 MODEL: Recommender | None = None
 PRODUCER: Any = None
 
@@ -42,17 +44,20 @@ async def lifespan(_: FastAPI):
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         logger.error("Recommendation artifacts are missing or invalid: %s", exc)
     try:
-        if KafkaProducer is None:
+        if not settings.kafka_bootstrap_servers:
+            logger.info("Kafka is disabled; events will be written to local JSONL files")
+        elif KafkaProducer is None:
             raise KafkaError("Kafka client is unavailable")
-        PRODUCER = KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda value: json.dumps(value, separators=(",", ":")).encode(),
-            acks="all",
-            retries=5,
-            max_in_flight_requests_per_connection=1,
-        )
+        else:
+            PRODUCER = KafkaProducer(
+                bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+                value_serializer=lambda value: json.dumps(value, separators=(",", ":")).encode(),
+                acks="all",
+                retries=5,
+                max_in_flight_requests_per_connection=1,
+            )
     except KafkaError:
-        logger.exception("Kafka is unavailable at startup; event ingestion will return 503")
+        logger.exception("Kafka is unavailable at startup; events will be written locally")
     yield
     if PRODUCER is not None:
         PRODUCER.flush(timeout=5)
@@ -82,17 +87,28 @@ class EventRequest(BaseModel):
 
 
 def publish(payload: dict) -> None:
-    if PRODUCER is None:
-        raise HTTPException(status_code=503, detail="Event broker is not available")
     payload.setdefault("event_id", uuid.uuid4().hex)
+    payload.setdefault("timestamp_ms", int(time.time() * 1000))
+    if PRODUCER is None:
+        _write_event_locally(payload)
+        EVENTS.labels(payload["event_type"]).inc()
+        return
     try:
         PRODUCER.send(
             settings.kafka_topic, value=payload, key=str(payload["visitor_id"]).encode()
         ).get(timeout=5)
-    except KafkaError as exc:
+    except KafkaError:
         logger.exception("Kafka publish failed")
-        raise HTTPException(status_code=503, detail="Could not publish event") from exc
+        _write_event_locally(payload)
     EVENTS.labels(payload["event_type"]).inc()
+
+
+def _write_event_locally(payload: dict) -> None:
+    event_day = time.strftime("%Y-%m-%d", time.gmtime(payload["timestamp_ms"] / 1000))
+    path = settings.event_log_dir / f"events-{event_day}.jsonl"
+    settings.event_log_dir.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as output:
+        output.write(json.dumps(payload, separators=(",", ":")) + "\n")
 
 
 def require_api_key(x_api_key: str | None = Header(default=None)) -> None:

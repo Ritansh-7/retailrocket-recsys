@@ -32,16 +32,16 @@ stages:
       size: 94237913
     - path: src/recsys/config.py
       hash: md5
-      md5: aa06154b704419274db18d11befc7591
-      size: 711
+      md5: 7242f6b820df865cc1142689a370b286
+      size: 704
     - path: src/recsys/model.py
       hash: md5
-      md5: 05ddb2091e6acaa13f7b0b5f84de9d76
-      size: 1503
+      md5: 5c95de435d1b14060f9b9cc61a97e9b4
+      size: 1855
     - path: src/recsys/train_fast.py
       hash: md5
-      md5: 3d1bc29e5fc2d018bc1b5f3032bbe748
-      size: 4553
+      md5: 550ed9bc5598ae3bf09d273307eb8197
+      size: 7321
     outs:
     - path: artifacts/item_features.parquet
       hash: md5
@@ -57,8 +57,8 @@ stages:
       size: 874461
     - path: artifacts/metrics.json
       hash: md5
-      md5: 6bc2db3402232e0978f3798e2f37f54e
-      size: 271
+      md5: ab59807ab37aac2f9d5fa85fd4e262b8
+      size: 353
     - path: artifacts/popular_items.json
       hash: md5
       md5: 4a348265905443cf8053cd739198c6e8
@@ -67,6 +67,10 @@ stages:
       hash: md5
       md5: a4ae2ad16f8305ec46b50c9c6276f93f
       size: 67857
+    - path: artifacts/sklearn_neighbors.json
+      hash: md5
+      md5: 96fd525239054aa00d3c07d7a9030c69
+      size: 7141814
     - path: artifacts/visitor_features.parquet
       hash: md5
       md5: 81f4c10b335341986032101be721e7b6

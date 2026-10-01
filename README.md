@@ -16,7 +16,9 @@ The offline baseline recommends popular products. The treatment recommender uses
 2. Copy `.env.example` to `.env` and replace both secrets with unique random values.
 3. Keep the supplied source files in `data/raw/` (already copied here). Track them with `dvc add -f data/raw`, then configure and push to a shared DVC remote before expecting another machine or GitHub runner to retrieve them.
 4. On Windows, run `dvc repro` from the included `.venv`; the DVC stages use `.venv/Scripts/python.exe` explicitly. Artifacts are written under `artifacts/` and the run is recorded in MLflow when the tracking server is available.
-5. Run `docker compose up --build -d`. The API, MLflow, Prometheus, and Grafana bind to localhost; Kafka stays on the internal Docker network. Grafana is at `http://localhost:3000`, MLflow at `http://localhost:5000`, Prometheus at `http://localhost:9090`, and the API at `http://localhost:8000`.
+5. On Windows, run `./install-local-tools.ps1` once to download project-local Java/Kafka, Kafka UI, Prometheus, and Grafana binaries under ignored `.local-data/` (about 715 MB; no system-wide install).
+6. Run `./start-local.ps1` to launch Kafka, Kafka UI, MLflow, the API, event sink, load generator, Streamlit, Prometheus, and Grafana without Docker. On first start, the existing recommender artifacts are logged to MLflow and registered as `retailrocket-item-neighbors`; MLflow uses a local SQLite backend so model registry works. Add `-RunDvc` to run `dvc repro` before startup. The launcher selects free ports and prints the URLs, so it can run alongside Docker. Grafana uses the values from `.env` (`GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`), with defaults of `admin` / `localdev`.
+7. Stop the native services with `./stop-local.ps1`. Run the full containerized stack instead with `docker compose up --build -d`.
 
 Recommendation request example:
 

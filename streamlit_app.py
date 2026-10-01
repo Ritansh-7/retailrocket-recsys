@@ -13,6 +13,12 @@ from recsys.model import Recommender
 ROOT = Path(__file__).resolve().parent
 ARTIFACT_DIR = Path(os.getenv("RECSYS_ARTIFACT_DIR", ROOT / "artifacts"))
 GITHUB_REPO = "https://github.com/Ritansh-7/retailrocket-recsys"
+GRAFANA_URL = os.getenv("RECSYS_GRAFANA_URL", "http://localhost:3000")
+PROMETHEUS_URL = os.getenv("RECSYS_PROMETHEUS_URL", "http://localhost:9090")
+MLFLOW_URL = os.getenv("RECSYS_MLFLOW_URL", "http://localhost:5000")
+MLFLOW_MODELS_URL = os.getenv("RECSYS_MLFLOW_MODELS_URL", f"{MLFLOW_URL}/#/models")
+KAFKA_UI_URL = os.getenv("RECSYS_KAFKA_UI_URL", "http://localhost:8080")
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("RECSYS_KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
 
 st.set_page_config(
     page_title="RetailRocket recommender", page_icon=":material/analytics:", layout="wide"
@@ -38,7 +44,10 @@ def format_rate(value: float | int) -> str:
 
 def render_overview(metrics: dict) -> None:
     st.subheader("Offline evaluation")
-    st.caption("Temporal holdout metrics from the trained RetailRocket interaction model.")
+    st.caption(
+        "Temporal holdout metrics from the trained RetailRocket interaction model. "
+        "Treatment uses scikit-learn NearestNeighbors with cosine similarity."
+    )
     control_rate = metrics.get("control_hit_rate_at_10", 0.0)
     treatment_rate = metrics.get("treatment_hit_rate_at_10", 0.0)
     lift = treatment_rate - control_rate
@@ -47,15 +56,13 @@ def render_overview(metrics: dict) -> None:
         st.metric("Treatment hit rate@10", format_rate(treatment_rate), border=True)
         st.metric("Absolute lift", format_rate(lift), border=True)
         st.metric("Evaluation visitors", f"{metrics.get('evaluation_users', 0):,}", border=True)
-    chart = pd.DataFrame(
-        {
-            "policy": ["Control · popular", "Treatment · co-visitation"],
-            "hit_rate_at_10": [control_rate, treatment_rate],
-        }
-    ).set_index("policy")
     with st.container(border=True):
         st.subheader("Policy comparison")
-        st.bar_chart(chart, y="hit_rate_at_10", height=300)
+        st.progress(control_rate, text=f"Control · popular · {format_rate(control_rate)}")
+        st.progress(
+            treatment_rate,
+            text=f"Treatment · sklearn item-item · {format_rate(treatment_rate)}",
+        )
 
 
 def render_recommender() -> None:
@@ -93,20 +100,28 @@ def main() -> None:
         )
         st.caption(f"Artifacts: {ARTIFACT_DIR}")
         st.markdown("### Platform links")
+        st.link_button("Open Kafka UI", KAFKA_UI_URL, icon=":material/hub:", width="stretch")
+        st.caption(f"Kafka broker: `{KAFKA_BOOTSTRAP_SERVERS}`")
+        if GRAFANA_URL:
+            st.link_button(
+                "Open Grafana", GRAFANA_URL, icon=":material/dashboard:", width="stretch"
+            )
+        if PROMETHEUS_URL:
+            st.link_button(
+                "Open Prometheus",
+                PROMETHEUS_URL,
+                icon=":material/query_stats:",
+                width="stretch",
+            )
+        st.link_button("Open MLflow", MLFLOW_URL, icon=":material/monitoring:", width="stretch")
         st.link_button(
-            "Open Grafana", "http://localhost:3000", icon=":material/dashboard:", width="stretch"
-        )
-        st.link_button(
-            "Open Prometheus",
-            "http://localhost:9090",
-            icon=":material/query_stats:",
+            "Open MLflow Model Registry",
+            MLFLOW_MODELS_URL,
+            icon=":material/model_training:",
             width="stretch",
         )
         st.link_button(
-            "Open MLflow", "http://localhost:5000", icon=":material/monitoring:", width="stretch"
-        )
-        st.link_button(
-            "Open DVC pipeline",
+            "Open DVC pipeline definition",
             f"{GITHUB_REPO}/blob/main/dvc.yaml",
             icon=":material/account_tree:",
             width="stretch",

@@ -8,11 +8,11 @@ class Settings(BaseSettings):
 
     data_dir: Path = Path("data/raw")
     artifact_dir: Path = Path("artifacts")
-    tracking_uri: str = "http://mlflow:5000"
+    tracking_uri: str = "http://127.0.0.1:5000"
     experiment_name: str = "retailrocket-recommendations"
     assignment_salt: str = "replace-this-before-production"
     api_key: str | None = None
-    kafka_bootstrap_servers: str = "kafka:9092"
+    kafka_bootstrap_servers: str = ""
     kafka_topic: str = "recommendation-events"
     event_log_dir: Path = Path("data/events")
     recommendation_count: int = 10
