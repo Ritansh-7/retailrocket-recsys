@@ -12,6 +12,7 @@ from recsys.model import Recommender
 
 ROOT = Path(__file__).resolve().parent
 ARTIFACT_DIR = Path(os.getenv("RECSYS_ARTIFACT_DIR", ROOT / "artifacts"))
+GITHUB_REPO = "https://github.com/Ritansh-7/retailrocket-recsys"
 
 st.set_page_config(
     page_title="RetailRocket recommender", page_icon=":material/analytics:", layout="wide"
@@ -91,6 +92,26 @@ def main() -> None:
             "View", ["Overview", "Recommendation playground"], label_visibility="collapsed"
         )
         st.caption(f"Artifacts: {ARTIFACT_DIR}")
+        st.markdown("### Platform links")
+        st.link_button(
+            "Open Grafana", "http://localhost:3000", icon=":material/dashboard:", width="stretch"
+        )
+        st.link_button(
+            "Open Prometheus",
+            "http://localhost:9090",
+            icon=":material/query_stats:",
+            width="stretch",
+        )
+        st.link_button(
+            "Open MLflow", "http://localhost:5000", icon=":material/monitoring:", width="stretch"
+        )
+        st.link_button(
+            "Open DVC pipeline",
+            f"{GITHUB_REPO}/blob/main/dvc.yaml",
+            icon=":material/account_tree:",
+            width="stretch",
+        )
+        st.caption("DVC is managed from the terminal: `dvc status` or `dvc repro`.")
     metrics = load_metrics(str(ARTIFACT_DIR / "metrics.json"))
     if not metrics:
         st.warning(
