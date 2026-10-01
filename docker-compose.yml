@@ -64,6 +64,8 @@ services:
     environment:
       RECSYS_ARTIFACT_DIR: /app/artifacts
       RECSYS_ASSIGNMENT_SALT: ${RECSYS_ASSIGNMENT_SALT:?Set RECSYS_ASSIGNMENT_SALT in .env}
+      HOME: /tmp
+      STREAMLIT_GLOBAL_DEVELOPMENT_MODE: "false"
     volumes:
       - ./artifacts:/app/artifacts:ro
     ports:
